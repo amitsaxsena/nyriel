@@ -249,11 +249,20 @@ class nyrielExtensionController extends Controller
     }
 
     /**
-     * Extension card entry point. The designer already renders every schema
-     * group with real controls, so landing here would just be a worse second
-     * copy of it — send the admin straight to the designer instead.
+     * Extension entry point.
+     *
+     * Opening the extension opens the designer, because that is the only place
+     * anything is configurable — the card is just a summary plus a link. Sending
+     * the admin to the designer directly means one click after installing
+     * instead of two, and it is where they were going anyway.
      */
-    public function index(): View
+    public function index(): RedirectResponse
+    {
+        return redirect()->route('admin.extensions.nyriel.designer');
+    }
+
+    /** The summary card. Reachable from the designer's Back link. */
+    public function card(): View
     {
         return $this->view->make('admin.extensions.nyriel.card', [
             'groups' => self::groups(),

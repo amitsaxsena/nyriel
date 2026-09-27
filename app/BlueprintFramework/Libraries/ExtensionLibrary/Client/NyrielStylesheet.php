@@ -51,6 +51,21 @@ class NyrielStylesheet
         return ((string) $this->get($key, $default ? '1' : '0')) === '1';
     }
 
+    /**
+     * Read a setting on behalf of another builder in this namespace — the
+     * animation library shares this one's settings repository rather than
+     * taking a second dependency on Blueprint.
+     */
+    public function publicGet(string $key, string $default = ''): string
+    {
+        return (string) $this->get($key, $default);
+    }
+
+    public function publicOn(string $key, bool $default = false): bool
+    {
+        return $this->on($key, $default);
+    }
+
     public function etag(): string
     {
         return substr(md5(implode('|', array_map(
@@ -117,6 +132,9 @@ class NyrielStylesheet
             '--ny-pattern'     => (int) $get('background_magicsize', 24) . 'px',
             '--ny-pattern-op'  => round((int) $get('background_magicopacity', 30) / 100, 2),
             '--ny-font'        => $fontStack,
+            // Referenced by the glow keyframe, which animates a shadow.
+            '--ny-accent-glow'  => 'color-mix(in srgb, ' . $accent . ' 35%, transparent)',
+            '--ny-accent-transparent' => 'color-mix(in srgb, ' . $accent . ' 0%, transparent)',
         ] as $k => $v) {
             $css .= "  {$k}: {$v};\n";
         }
@@ -412,6 +430,101 @@ class NyrielStylesheet
             $rule(':root', "--ny-radius: {$radiusAlias}px;");
         }
 
+        /* ── Feature styles ────────────────────────────────────────
+           Emitted only when the feature is on, so a disabled one leaves no
+           rules behind at all. */
+
+        if ($this->on('multitasking', true)) {
+            $rule('.ny-frame',
+                'position: fixed; z-index: 990; right: 5vw; top: 10vh;'
+                . "\n  width: min(860px, 90vw); height: min(620px, 78vh); display: flex; flex-direction: column;"
+                . "\n  background: var(--ny-bg-alt); border: 1px solid var(--ny-border);"
+                . "\n  border-radius: var(--ny-radius); overflow: hidden; opacity: 0; transform: scale(.96);"
+                . "\n  box-shadow: 0 24px 70px rgba(0,0,0,.55);"
+                . "\n  transition: opacity .18s ease, transform .18s ease, box-shadow .18s ease;");
+            $rule('.ny-frame.is-focused', 'box-shadow: 0 28px 90px rgba(0,0,0,.7), 0 0 0 1px var(--ny-accent);');
+            $rule('.ny-frame-bar',
+                'display: flex; align-items: center; gap: 8px; padding: 8px 10px; cursor: grab;'
+                . "\n  background: var(--ny-bg-hover); border-bottom: 1px solid var(--ny-border);"
+                . "\n  user-select: none; flex: 0 0 auto;");
+            $rule('.ny-frame-bar:active', 'cursor: grabbing;');
+            $rule('.ny-frame-title',
+                'font-size: 12px; color: var(--ny-dim); overflow: hidden;'
+                . "\n  text-overflow: ellipsis; white-space: nowrap; flex: 1;");
+            $rule('.ny-frame-x',
+                'background: none; border: 0; color: var(--ny-dim); font-size: 20px; line-height: 1;'
+                . "\n  cursor: pointer; padding: 0 4px;");
+            $rule('.ny-frame-x:hover', 'color: var(--ny-text);');
+            $rule('.ny-frame-body', 'flex: 1; width: 100%; border: 0; background: var(--ny-bg); opacity: 0; transition: opacity .2s ease;');
+            $rule('.ny-frame-load',
+                'position: absolute; inset: 34px 0 0; display: flex; align-items: center; justify-content: center;'
+                . "\n  background: var(--ny-bg-alt); transition: opacity .2s ease;");
+            $rule('.ny-frame-spin',
+                'width: 26px; height: 26px; border: 2px solid var(--ny-border);'
+                . "\n  border-top-color: var(--ny-accent); border-radius: 50%;"
+                . "\n  animation: ny-spin .7s linear infinite;");
+            $rule('.ny-frame-grip',
+                'position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize;'
+                . "\n  background: linear-gradient(135deg, transparent 50%, var(--ny-border) 50%);");
+
+            $css .= 'body:has(.ny-frame) { overflow: hidden; }' . "\n";
+        }
+
+        if ($this->on('status_orb', true)) {
+            $rule('#ny-orb',
+                'position: fixed; z-index: 40; right: 18px; bottom: 18px; width: 12px; height: 12px;'
+                . "\n  border-radius: 50%; box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 18%, transparent);"
+                . "\n  pointer-events: none; transition: opacity .25s ease;");
+        }
+
+        if ($this->on('keybind_help', true)) {
+            $rule('#ny-keys',
+                'position: fixed; inset: 0; z-index: 9998; display: flex; align-items: center; justify-content: center;'
+                . "\n  background: rgba(3,6,12,.6); backdrop-filter: blur(5px);");
+            $rule('#ny-keys[hidden]', 'display: none;');
+            $rule('.ny-keys-inner',
+                'width: min(420px, 92vw); padding: 18px 20px; background: var(--ny-bg-alt);'
+                . "\n  border: 1px solid var(--ny-border); border-radius: var(--ny-radius);");
+            $rule('#ny-keys header',
+                'display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;');
+            $rule('.ny-keys-x', 'background: none; border: 0; color: var(--ny-dim); font-size: 20px; cursor: pointer;');
+            $rule('.ny-keys-row',
+                'display: flex; align-items: center; justify-content: space-between; padding: 6px 0;'
+                . "\n  font-size: 12.5px; color: var(--ny-dim); border-bottom: 1px solid color-mix(in srgb, var(--ny-border) 60%, transparent);");
+            $rule('#ny-keys kbd',
+                'font: 600 11px ui-monospace, monospace; padding: 2px 7px; border-radius: 5px;'
+                . "\n  background: var(--ny-bg-hover); border: 1px solid var(--ny-border); color: var(--ny-text);");
+            $rule('.ny-keys-note', 'margin: 12px 0 0; font-size: 11.5px; color: var(--ny-dim); opacity: .75;');
+        }
+
+        if ($this->on('mobile_nav', true)) {
+            // Below 768px the rail becomes a bottom bar, because a fixed
+            // column eats a third of a phone screen.
+            $css .= "@media (max-width: 768px) {\n"
+                 . "  #nyriel-rail {\n"
+                 . "    position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: 100% !important;\n"
+                 . "    flex-direction: row !important; align-items: center; gap: 2px;\n"
+                 . "    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));\n"
+                 . "    border-right: 0 !important; border-top: 1px solid var(--ny-border);\n"
+                 . "    border-radius: 0 !important; overflow-x: auto; z-index: 60;\n"
+                 . "  }\n"
+                 . "  #nyriel-rail .cat { display: none; }\n"
+                 . "  #nyriel-rail .aether-nav { width: auto; flex: 0 0 auto; padding: 9px 11px; }\n"
+                 . "  #nyriel-rail .aether-nav:hover { transform: none; }\n"
+                 . "  #nyriel-rail .keyhint { display: none; }\n"
+                 . "  body { padding-left: 0 !important; padding-bottom: 64px !important; }\n"
+                 . "  div[class*='ProgressBar'] { left: 0 !important; width: 100% !important; }\n"
+                 . "  #ny-mobiletoggle {\n"
+                 . "    position: fixed; z-index: 61; right: 12px; bottom: calc(72px + env(safe-area-inset-bottom));\n"
+                 . "    width: 40px; height: 40px; border-radius: 10px; cursor: pointer; font-size: 17px;\n"
+                 . "    background: var(--ny-bg-alt); color: var(--ny-text);\n"
+                 . "    border: 1px solid var(--ny-border);\n"
+                 . "  }\n"
+                 . "  .ny-frame { right: 4vw !important; left: 4vw !important; width: auto !important;"
+                 . " height: 70vh !important; }\n"
+                 . "}\n";
+        }
+
         /* Status dots. */
         $rule('.status-bar, [class*="ServerCard"] .status-bar', '--ActiveColor: var(--ny-st-offline);');
 
@@ -420,6 +533,12 @@ class NyrielStylesheet
         $rule('.nyriel-lift:hover', 'transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,0,0,.35);', $animations);
         if ($animations) {
             $css .= "@media (prefers-reduced-motion: reduce) {\n  .nyriel-lift { animation: none !important; transition: none !important; }\n}\n";
+        }
+
+        // The animation library is a separate builder so its 14 keyframes and
+        // the stagger rules stay out of this file; it reads the same settings.
+        if (class_exists(\Pterodactyl\BlueprintFramework\Libraries\ExtensionLibrary\Client\NyrielAnimations::class)) {
+            $css .= "\n" . (new NyrielAnimations($this))->css();
         }
 
         $css .= "::-webkit-scrollbar { width: 9px; height: 9px; }\n";

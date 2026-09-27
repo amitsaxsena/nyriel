@@ -203,7 +203,9 @@ $ctxPos     = $a('contextmenu_pos', 'cursor');
 $cfg = [
     'nav'    => $nav,
     'family' => $family, 'weight' => $iconWeight,
-    'scale' => $iconScale, 'wide' => $wide, 'animate' => $animations,
+    'scale' => $iconScale, 'wide' => $wide,
+    'animate' => $animations, 'animations' => $animations,   // both names: the JS reads .animations
+    'fxStagger' => $on('fx_stagger', true),
     'transparency' => $on('dashboard_transparency', true),
     'graphs' => $a('graph_style', 'area'),
     'stats' => $on('stat_animation', true),
@@ -217,7 +219,27 @@ $cfg = [
     ],
     'pill' => $a('statusgradient_style', 'default'),
     'keys' => $keybinds, 'shortcuts' => $shortcuts,
-    'keyHints' => $on('keybind_icons'),
+    'keyHints'    => $on('keybind_icons'),
+    'keybindHelp'  => $on('keybind_help', true),
+    'middleClick'  => $on('middle_click', true),
+    'multitasking' => $on('multitasking', true),
+    'statusOrb'    => $on('status_orb', true),
+    'mobileNav'    => $on('mobile_nav', true),
+
+    // Animation flags. Read individually rather than as a list so a new effect
+    // in the schema only needs adding here, not in a second table.
+    'fxStagger'         => $on('fx_stagger', true),
+    'fx_fade'           => $on('fx_fade', true),
+    'fx_rise'           => $on('fx_rise', true),
+    'fx_drop'           => $on('fx_drop'),
+    'fx_pop'            => $on('fx_pop'),
+    'fx_swing'          => $on('fx_swing'),
+    'fx_blur'           => $on('fx_blur'),
+    'fx_hover_lift'     => $on('fx_hover_lift', true),
+    'fx_hover_glow'     => $on('fx_hover_glow'),
+    'fx_status_breathe' => $on('fx_status_breathe', true),
+    'fx_status_pulse'   => $on('fx_status_pulse'),
+    'fx_loading_sheen'  => $on('fx_loading_sheen', true),
     'ctx' => ['files'=>$ctxFiles,'servers'=>$ctxServers,'sidebar'=>$ctxSidebar,'pos'=>$ctxPos],
     'alert' => ['md'=>$alertMd,'timeout'=>$alertTmo,'dismiss'=>$alertDismis,'pos'=>$alertPos],
 ];

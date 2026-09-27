@@ -248,6 +248,8 @@ return [
         'fields' => [
             'keyboard_shortcuts' => ['type' => 'bool', 'default' => '0', 'label' => 'Keyboard shortcuts'],
             'keybind_icons'      => ['type' => 'bool', 'default' => '1', 'label' => 'Show key hints in sidebar'],
+            'keybind_help'      => ['type' => 'bool', 'default' => '1', 'label' => 'Shortcut reference', 'hint' => 'Press ? for a modal listing every shortcut'],
+            'middle_click'      => ['type' => 'bool', 'default' => '1', 'label' => 'Middle-click opens a tab', 'hint' => 'Middle-click or Ctrl/Cmd-click a sidebar button'],
             'keybinds'           => ['type' => 'text', 'default' => '', 'label' => 'Custom keymap (JSON)', 'hint' => 'Leave blank for defaults'],
             'keybind_nav_prev'   => ['type' => 'text', 'default' => 'k', 'label' => 'Navigate up', 'hint' => 'Single key, ignores modifiers'],
             'keybind_nav_next'   => ['type' => 'text', 'default' => 'j', 'label' => 'Navigate down'],
@@ -335,5 +337,49 @@ return [
             'admin_watermark'    => ['type' => 'bool',  'default' => '0', 'label' => 'Admin footer watermark'],
         ],
     ],
-
+    /* ── animations ───────────────────────────────────────────────── */
+    'animations' => [
+        'label' => 'Animations',
+        'hint'  => 'Every effect is generated from the schema. Motion respects the '
+            . 'operating system\'s reduced-motion setting, so a user who asked for less '
+            . 'gets none regardless of these settings.',
+        'fields' => [
+            'animation_speed'      => ['type' => 'number', 'default' => 300, 'min' => 50, 'max' => 1200, 'step' => 10, 'label' => 'Duration', 'unit' => 'ms'],
+            'animation_easing'     => ['type' => 'select', 'default' => 'cubic-bezier(.22,1,.36,1)', 'label' => 'Easing', 'options' => [
+                                            'ease'                        => 'Ease',
+                                            'ease-in'                     => 'Ease in',
+                                            'ease-out'                    => 'Ease out',
+                                            'ease-in-out'                 => 'Ease in-out',
+                                            'linear'                      => 'Linear',
+                                            'cubic-bezier(.22,1,.36,1)'   => 'Expo out (default)',
+                                            'cubic-bezier(.34,1.56,.64,1)' => 'Back out',
+                                            'cubic-bezier(.16,1,.3,1)'    => 'Quint out',
+                                        ]],
+            'animation_stagger'     => ['type' => 'number', 'default' => 40, 'min' => 0, 'max' => 200, 'step' => 5, 'label' => 'Row stagger', 'unit' => 'ms', 'hint' => 'Delay between consecutive rows'],
+            'animation_stagger_max' => ['type' => 'number', 'default' => 24, 'min' => 1, 'max' => 400, 'step' => 1, 'label' => 'Stagger cap', 'unit' => 'rows', 'hint' => 'Past this many rows the delay stops growing, so a long list settles quickly'],
+            'fx_stagger'            => ['type' => 'bool', 'default' => '1', 'label' => 'Stagger list rows'],
+            'fx_fade'               => ['type' => 'bool', 'default' => '1', 'label' => 'Fade in'],
+            'fx_rise'               => ['type' => 'bool', 'default' => '1', 'label' => 'Rise in (from below)'],
+            'fx_drop'               => ['type' => 'bool', 'default' => '0', 'label' => 'Drop in (from above)'],
+            'fx_pop'                => ['type' => 'bool', 'default' => '0', 'label' => 'Pop in (scale)'],
+            'fx_swing'              => ['type' => 'bool', 'default' => '0', 'label' => 'Swing in (from the left)'],
+            'fx_blur'               => ['type' => 'bool', 'default' => '0', 'label' => 'Blur in'],
+            'fx_hover_lift'         => ['type' => 'bool', 'default' => '1', 'label' => 'Hover lift'],
+            'fx_hover_glow'         => ['type' => 'bool', 'default' => '0', 'label' => 'Hover glow'],
+            'fx_status_breathe'     => ['type' => 'bool', 'default' => '1', 'label' => 'Status dot breathes'],
+            'fx_status_pulse'       => ['type' => 'bool', 'default' => '0', 'label' => 'Status dot pulses'],
+            'fx_loading_sheen'      => ['type' => 'bool', 'default' => '1', 'label' => 'Loading sheen'],
+        ],
+    ],
+    /* ── features ────────────────────────────────────────────────── */
+    'features' => [
+        'label' => 'Features',
+        'hint'  => 'Floating frames, a live status indicator, and a mobile layout. '
+            . 'Each costs nothing when off.',
+        'fields' => [
+            'multitasking'  => ['type' => 'bool', 'default' => '1', 'label' => 'Floating frames', 'hint' => 'Alt/Ctrl/Cmd-click a link to open it in a draggable, resizable window'],
+            'status_orb'    => ['type' => 'bool', 'default' => '1', 'label' => 'Status indicator', 'hint' => 'A fixed dot that takes the current server\'s status colour'],
+            'mobile_nav'    => ['type' => 'bool', 'default' => '1', 'label' => 'Mobile layout', 'hint' => 'Below 768px the sidebar becomes a bottom bar instead of a fixed column'],
+        ],
+    ],
 ];

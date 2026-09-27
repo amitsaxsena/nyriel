@@ -229,6 +229,9 @@
       if (location.pathname === last) return;
       last = location.pathname;
       navWire();
+      // The router swapped the content, so anything the new view rendered has
+      // to be tagged again.
+      setTimeout(() => { applyAnimations(); }, 40);
     };
     // The panel is a SPA: it patches history and re-renders in place, so there
     // is no navigation event to listen for. Observing <body> is the cheapest
@@ -449,6 +452,358 @@
 
   /* ── boot ──────────────────────────────────────────────────────── */
 
+/* ── Animations ─────────────────────────────────────────────────────
+   The stylesheet defines the motion; this decides what gets it. Classes are
+   applied to the panel's own rows, cards and status dots, and only when the
+   corresponding setting is on — so a disabled effect costs nothing.
+
+   All of this degrades to nothing under prefers-reduced-motion, which the
+   stylesheet enforces. */
+
+  /** Which entry animation a container's children get. */
+  const ENTRY_CLASSES = [
+    ['fx_fade',  'ny-fade-in'],
+    ['fx_rise',  'ny-rise-in'],
+    ['fx_drop',  'ny-drop-in'],
+    ['fx_pop',   'ny-pop-in'],
+    ['fx_swing', 'ny-swing-in'],
+    ['fx_blur',  'ny-blur-in'],
+  ];
+
+  // Selectors for the panel's repeated rows. These are the stable class names
+  // and data attributes the panel renders, not its styled-components hashes.
+  const ROW_SELECTORS = [
+    '[class*="ServerCard"]',            // dashboard server cards
+    '[class*="ServerRow"]',             // server list rows
+    'table tbody tr',                   // backups, schedules, subusers
+    '[class*="ScheduleRow"]',
+    '[class*="ActivityLog"]',
+    '[class*="DatabaseRow"]',
+    '[class*="UserRow"]',
+    // The panel has no <main>; these are the wrappers it actually renders, so
+    // a page with no servers still animates something.
+    '[class*="PageContentBlock"] > div',
+    '[class*="ContentBox"] > div',
+  ];
+
+  const CARD_SELECTORS = [
+    '.box',                              // admin panel
+    '[class*="ContentBox"]',             // client panel content cards
+    '[class*="PageContentBlock"]',
+  ];
+
+  // The config island mixes camelCase and snake_case (fxStagger vs fx_fade).
+  // Read through one normaliser so a rename in the wrapper cannot silently
+  // disable half the motion.
+  const flag = name => cfg[name] ?? cfg[name.replace(/_([a-z])/g, (m, c) => c.toUpperCase())];
+
+  function applyAnimations() {
+    if (!flag('animations')) return;
+
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) return;                 // stylesheet already neutralises them
+
+    // One entry effect for the whole page, so rows do not each pick their own.
+    const entry = (ENTRY_CLASSES.find(([k]) => flag(k)) || [])[1];
+
+    // Tag each repeated row group as a stagger container, then let the
+    // stylesheet's nth-child rules do the sequencing. Re-tagging on every call
+    // is fine: the class is the same, and setAttribute is idempotent.
+    if (flag('fx_stagger') && entry) {
+      ROW_SELECTORS.forEach(sel => {
+        $$(sel).forEach(row => {
+          if (row.closest('.ny-stagger')) return;   // already inside one
+          const group = row.parentElement;
+          if (!group) return;
+          group.classList.add('ny-stagger');
+        });
+      });
+    }
+
+    if (entry) {
+      // Animate the page's own content wrapper once, not every node in it.
+      const root = $('[class*="App___StyledDiv"]') || $('[class*="ContentBox"]');
+      if (root) root.classList.add(entry);
+      CARD_SELECTORS.forEach(sel => {
+        $$(sel).forEach((el, i) => {
+          if (el.classList.contains('ny-fade-in')) return;
+          // A card that is already on screen when the page loads does not need
+          // to fly in; only the ones the router swapped in do.
+          if (el.classList.contains('ny-stagger') || el.classList.contains(entry)) return;
+          el.classList.add(entry);
+        });
+      });
+    }
+
+    if (flag('fx_hover_lift')) {
+      $$('.box, [class*="ServerCard"], .small-box').forEach(el => {
+        el.classList.add('ny-lift');
+      });
+    }
+
+    // Status dots: a breathing dot reads as "live" without a number next to it.
+    if (flag('fx_status_breathe') || flag('fx_status_pulse')) {
+      const dotClass = flag('fx_status_pulse') ? 'ny-pulse' : 'ny-breathe';
+      $$('.status-bar, [class*="ServerCard"] .status-bar').forEach(el => {
+        el.classList.add(dotClass);
+      });
+    }
+  }
+
+  /** Remove every animation class, for the Live toggle in the designer. */
+  function clearAnimations() {
+    $$('.ny-stagger').forEach(el => el.classList.remove('ny-stagger'));
+    $$('.ny-lift, .ny-pulse, .ny-breathe').forEach(el => {
+      el.classList.remove('ny-lift', 'ny-pulse', 'ny-breathe');
+    });
+    const all = ENTRY_CLASSES.map(([, c]) => c);
+    all.forEach(c => $$(`.${c}`).forEach(el => el.classList.remove(c)));
+  }
+
+/* ── Multitasking ──────────────────────────────────────────────────
+   Nebula's floating windows: a page opens in a draggable, resizable frame
+   instead of replacing the whole app, so the terminal stays visible while a
+   settings page is open. Implemented independently against the panel's own
+   links; nothing here depends on generated class hashes. */
+
+  const WIN_MIN_W = 480;
+  const WIN_MIN_H = 240;
+
+  function wireMultitasking() {
+    if (!flag('multitasking')) return;
+
+    // A modifier-click opens in a frame instead of navigating, which is the
+    // same gesture a browser uses for "open in new tab".
+    const openInFrame = url => {
+      const existing = document.querySelector('.ny-frame[data-ny-src="' + cssEscape(url) + '"]');
+      if (existing) { focusFrame(existing); return; }
+
+      const wrap = document.createElement('div');
+      wrap.className = 'ny-frame';
+      wrap.dataset.nySrc = url;
+      wrap.innerHTML =
+        '<div class="ny-frame-bar">' +
+          '<span class="ny-frame-title">' + escapeHtml(url.replace(location.origin, '')) + '</span>' +
+          '<button type="button" class="ny-frame-x" aria-label="Close">&times;</button>' +
+        '</div>' +
+        '<div class="ny-frame-load"><span class="ny-frame-spin"></span></div>' +
+        '<iframe class="ny-frame-body" src="' + escapeHtml(url) + '" title=""></iframe>';
+
+      document.body.appendChild(wrap);
+      wireFrame(wrap);
+      return wrap;
+    };
+
+    // A safe CSS.escape, because the value goes into an attribute selector.
+    const cssEscape = s => (window.CSS && CSS.escape ? CSS.escape(s) : s.replace(/["\\]/g, '\\$&'));
+
+    const focusFrame = frame => {
+      document.querySelectorAll('.ny-frame').forEach(f => {
+        const on = f === frame;
+        f.style.zIndex = on ? 1000 : 990;
+        f.classList.toggle('is-focused', on);
+      });
+    };
+
+    function wireFrame(frame) {
+      const bar = frame.querySelector('.ny-frame-bar');
+      const body = frame.querySelector('.ny-frame-body');
+      const loader = frame.querySelector('.ny-frame-load');
+
+      frame.querySelector('.ny-frame-x').onclick = e => { e.stopPropagation(); close(); };
+      function close() {
+        frame.style.opacity = '0';
+        frame.style.transform = 'scale(.96)';
+        setTimeout(() => frame.remove(), 180);
+      }
+
+      // The iframe is same-origin, so its own load event is observable.
+      body.addEventListener('load', () => {
+        loader.style.opacity = '0';
+        body.style.opacity = '1';
+        setTimeout(() => loader.remove(), 220);
+      }, { once: true });
+
+      frame.addEventListener('mousedown', () => focusFrame(frame), true);
+
+      // Drag by the bar.
+      let drag = null;
+      bar.addEventListener('mousedown', e => {
+        if (e.target.closest('.ny-frame-x')) return;
+        e.preventDefault();
+        focusFrame(frame);
+        const r = frame.getBoundingClientRect();
+        drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+        bar.setPointerCapture?.(e.pointerId);
+      });
+      bar.addEventListener('pointermove', e => {
+        if (!drag) return;
+        const w = frame.offsetWidth, h = frame.offsetHeight;
+        frame.style.left = Math.max(0, Math.min(e.clientX - drag.dx, innerWidth - 60)) + 'px';
+        frame.style.top = Math.max(0, Math.min(e.clientY - drag.dy, innerHeight - 40)) + 'px';
+        frame.style.right = 'auto';
+        frame.style.bottom = 'auto';
+      });
+      bar.addEventListener('pointerup', () => { drag = null; });
+
+      // Resize from the bottom-right corner.
+      const grip = document.createElement('div');
+      grip.className = 'ny-frame-grip';
+      frame.appendChild(grip);
+      let size = null;
+      grip.addEventListener('mousedown', e => {
+        e.preventDefault(); e.stopPropagation();
+        const r = frame.getBoundingClientRect();
+        size = { x: e.clientX, y: e.clientY, w: r.width, h: r.height };
+        grip.setPointerCapture?.(e.pointerId);
+      });
+      grip.addEventListener('pointermove', e => {
+        if (!size) return;
+        frame.style.width = Math.max(WIN_MIN_W, size.w + (e.clientX - size.x)) + 'px';
+        frame.style.height = Math.max(WIN_MIN_H, size.h + (e.clientY - size.y)) + 'px';
+        frame.style.right = 'auto';
+        frame.style.bottom = 'auto';
+      });
+      grip.addEventListener('pointerup', () => { size = null; });
+    }
+
+    document.addEventListener('click', e => {
+      if (e.defaultPrevented || e.button !== 0) return;
+      if (!(e.altKey || e.metaKey || e.ctrlKey)) return;
+      const link = e.target.closest('a[href]');
+      if (!link) return;
+      const href = link.getAttribute('href');
+      if (!href || href.startsWith('http') || href.startsWith('#')) return;
+      e.preventDefault();
+      openInFrame(href);
+    });
+
+    // Escape closes the topmost frame, the same key the shortcuts use for
+    // every other overlay.
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      const frames = document.querySelectorAll('.ny-frame');
+      if (!frames.length) return;
+      const top = frames[frames.length - 1];
+      const x = top.querySelector('.ny-frame-x');
+      if (x) x.click();
+    });
+  }
+
+  /* ── Middle-click a sidebar button ────────────────────────────────
+     Opens the page in a real browser tab, which is what a middle click means
+     everywhere else. Nebula does this too; here it is a data attribute on the
+     button rather than a hardcoded list of ids. */
+
+  function wireMiddleClick() {
+    if (!flag('middleClick')) return;
+    $('#nyriel-rail')?.addEventListener('auxclick', e => {
+      if (e.button !== 1 && !(e.ctrlKey || e.metaKey)) return;
+      const btn = e.target.closest('.aether-nav');
+      if (!btn || !btn._link) return;
+      e.preventDefault();
+      window.open(btn._link.href, '_blank', 'noopener');
+    });
+  }
+
+  /* ── Status orb ───────────────────────────────────────────────────
+     A fixed dot that follows the current server's status. The panel only
+     renders a status bar on the server overview, so the orb reads that and
+     fades itself out when there is nothing to report. */
+
+  function wireStatusOrb() {
+    if (!flag('statusOrb')) return;
+    if ($('#ny-orb')) return;
+
+    const orb = document.createElement('div');
+    orb.id = 'ny-orb';
+    orb.hidden = true;
+    document.body.appendChild(orb);
+
+    const paint = () => {
+      // Prefer the panel's own bar; its --ActiveColor is the live status.
+      const bar = document.querySelector('[class*="ServerCard"] .status-bar, .status-bar');
+      if (!bar) { orb.hidden = true; return; }
+      const colour = getComputedStyle(bar).getPropertyValue('--ActiveColor').trim();
+      orb.style.background = colour || 'var(--ny-st-offline)';
+      orb.hidden = !colour;
+    };
+
+    paint();
+    new MutationObserver(paint).observe(document.body, { childList: true, subtree: true });
+  }
+
+  /* ── Keybind reference ────────────────────────────────────────────
+     Nebula opens a modal listing every shortcut. Same idea, built from the
+     keymap the panel already has rather than a second copy of it. */
+
+  function wireKeybindHelp() {
+    if (!flag('keybindHelp')) return;
+    if ($('#ny-keys')) return;
+
+    const rows = Object.entries(cfg.keys || {})
+      .map(([action, key]) =>
+        '<div class="ny-keys-row"><span>' + escapeHtml(action) + '</span>' +
+        '<kbd>' + escapeHtml(String(key).toUpperCase()) + '</kbd></div>')
+      .join('');
+
+    const box = document.createElement('div');
+    box.id = 'ny-keys';
+    box.hidden = true;
+    box.innerHTML =
+      '<div class="ny-keys-inner">' +
+        '<header><b>Keyboard shortcuts</b><button type="button" class="ny-keys-x" aria-label="Close">&times;</button></header>' +
+        rows +
+        '<p class="ny-keys-note">Alt+V toggles the file list/grid view. Escape closes this.</p>' +
+      '</div>';
+    document.body.appendChild(box);
+
+    const show = () => { box.hidden = false; };
+    const hide = () => { box.hidden = true; };
+    box.querySelector('.ny-keys-x').onclick = hide;
+    box.addEventListener('click', e => { if (e.target === box) hide(); });
+
+    // The help key defaults to "?" so it does not collide with the six the
+    // panel already binds.
+    document.addEventListener('keydown', e => {
+      if (typing(e)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === '?') { e.preventDefault(); box.hidden ? show() : hide(); }
+      if (e.key === 'Escape' && !box.hidden) hide();
+    });
+  }
+
+  /* ── Mobile navigation ────────────────────────────────────────────
+     The rail is a fixed column, which is unusable below 768px. Collapse it to
+     a bottom bar there, and give it a toggle so it can be put away. */
+
+  function wireMobileNav() {
+    const rail = $('#nyriel-rail');
+    if (!rail) return;
+
+    const mq = matchMedia('(max-width: 768px)');
+    const apply = () => {
+      document.documentElement.classList.toggle('ny-mobile', mq.matches);
+      if (mq.matches) {
+        if (!$('#ny-mobiletoggle')) {
+          const t = document.createElement('button');
+          t.id = 'ny-mobiletoggle';
+          t.type = 'button';
+          t.setAttribute('aria-label', 'Toggle navigation');
+          t.textContent = '☰';
+          t.onclick = () => document.body.classList.toggle('ny-rail-open');
+          document.body.appendChild(t);
+        }
+      } else {
+        document.body.classList.remove('ny-rail-open');
+        $('#ny-mobiletoggle')?.remove();
+      }
+    };
+
+    apply();
+    mq.addEventListener('change', apply);
+  }
+
   function boot() {
     renderAlert();
     wireAlert();
@@ -458,6 +813,12 @@
     animateCounters();
     navWire();
     showKeyHints();
+    applyAnimations();
+    wireMultitasking();
+    wireMiddleClick();
+    wireStatusOrb();
+    wireKeybindHelp();
+    wireMobileNav();
     watchNav();
   }
 
