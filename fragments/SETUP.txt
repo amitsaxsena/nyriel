@@ -1,0 +1,12 @@
+# Client wrapper symlink
+ln -sfn ../../../../../.blueprint/extensions/nyriel/wrappers/dashboard.blade.php \
+  resources/views/blueprint/dashboard/wrappers/nyriel.blade.php
+
+# Admin wrapper symlink
+ln -sfn ../../../../../.blueprint/extensions/nyriel/wrappers/admin.blade.php \
+  resources/views/blueprint/admin/wrappers/nyriel.blade.php
+
+# Registry entry in .blueprint/extensions/blueprint/private/db/installed_extensions
+# (a plain comma-separated identifier; Blueprint's '|' field separator
+#  inside a name breaks route registration for the whole panel)
+nyriel

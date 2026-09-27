@@ -1,0 +1,11 @@
+// Nyriel designer preview: frames the real client panel with unsaved settings.
+if (class_exists(\Pterodactyl\Http\Controllers\Extensions\NyrielPreviewController::class)) {
+    Route::get('/extensions/nyriel/preview', [
+        \Pterodactyl\Http\Controllers\Extensions\NyrielPreviewController::class,
+        '__invoke',
+    ])->name('nyriel.preview');
+}
+
+Route::get('/{react}', [Base\IndexController::class, 'index'])
+    ->where('react', '^(?!(\/)?(api|auth|admin|daemon)).+');
+

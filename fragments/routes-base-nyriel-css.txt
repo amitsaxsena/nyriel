@@ -1,0 +1,19 @@
+// too; the output is panel-wide theming, never user data.
+if (class_exists(\Pterodactyl\BlueprintFramework\Libraries\ExtensionLibrary\Client\NyrielStylesheetRouteAction::class)) {
+    Route::get('/themes/pterodactyl/css/nyriel.css', [
+        \Pterodactyl\BlueprintFramework\Libraries\ExtensionLibrary\Client\NyrielStylesheetRouteAction::class,
+        '__invoke',
+    ])->name('nyriel.css');
+}
+
+// Nyriel designer preview: frames the real client panel with unsaved settings.
+if (class_exists(\Pterodactyl\Http\Controllers\Extensions\NyrielPreviewController::class)) {
+    Route::get('/extensions/nyriel/preview', [
+        \Pterodactyl\Http\Controllers\Extensions\NyrielPreviewController::class,
+        '__invoke',
+    ])->name('nyriel.preview');
+}
+
+Route::get('/{react}', [Base\IndexController::class, 'index'])
+    ->where('react', '^(?!(\/)?(api|auth|admin|daemon)).+');
+
